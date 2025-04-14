@@ -192,7 +192,7 @@ public:
         // Emit WM_CHAR on keydown for characters
         if (wm.msg == WM_KEYDOWN) {
           WORD ascii[2] = { 0 };
-          if (1 == ToAscii(vk, vsc, KS, ascii, 0)) {
+          if (1 == ToUnicode(vk, vsc, KS, ascii, 2, 0)) {
             // Only process keys that have 1:1 character representation
             wm.msg = WM_CHAR;
             wm.wParam = ascii[0];
