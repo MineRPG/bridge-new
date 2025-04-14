@@ -200,17 +200,8 @@ bool remixMsg(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
   const bool uiWasActive = RemixState::isUIActive();
 
-  // 中文输入相关消息的特殊处理，保证这些消息一定会被传递到游戏
-  if (msg == WM_IME_CHAR || 
-      msg == WM_IME_COMPOSITION || 
-      msg == WM_IME_NOTIFY ||
-      msg == WM_IME_STARTCOMPOSITION ||
-      msg == WM_IME_ENDCOMPOSITION) {
-    // 将IME消息传递给游戏窗口过程，不拦截
-    gpRemixMessageChannel->send(msg, wParam, lParam);
-    return false;
-  }
-
+  // 中文输入相关消息的特殊处理已移至RemixWndProc函数中
+  
   // Process remix renderer-related messages
   if (gpRemixMessageChannel->onMessage(msg, wParam, lParam)) {
     if (!uiWasActive && RemixState::isUIActive()) {
@@ -286,14 +277,7 @@ bool remixMsg(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
   // Block the input message when Remix UI is active
   if (RemixState::isUIActive() && isInputMessage(msg)) {
-    // 确保IME相关消息不会被拦截
-    if (msg == WM_IME_CHAR || 
-        msg == WM_IME_COMPOSITION || 
-        msg == WM_IME_NOTIFY ||
-        msg == WM_IME_STARTCOMPOSITION ||
-        msg == WM_IME_ENDCOMPOSITION) {
-      return false;
-    }
+    // 确保IME相关消息不会在这里被拦截（已在RemixWndProc中处理）
     
     // Block all input except ALT key up event.
     // ALT is a very special key, we must pass the key up event for ALT or risking
@@ -312,6 +296,21 @@ LRESULT WINAPI RemixWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   if (msg == WM_ACTIVATEAPP || msg == WM_SIZE || msg == WM_DESTROY) {
     windowMsg(hWnd, msg, wParam, lParam);
   }
+  
+  // 对IME消息特殊处理
+  if (msg == WM_IME_CHAR || 
+      msg == WM_IME_COMPOSITION || 
+      msg == WM_IME_NOTIFY ||
+      msg == WM_IME_STARTCOMPOSITION ||
+      msg == WM_IME_ENDCOMPOSITION) {
+    // 直接传递给游戏窗口过程，不经过Remix处理
+    if (isUnicode) {
+      return CallWindowProcW(g_gameWndProc, hWnd, msg, wParam, lParam);
+    } else {
+      return CallWindowProcA(g_gameWndProc, hWnd, msg, wParam, lParam);
+    }
+  }
+  
   const bool bSwallowMsg = remixMsg(hWnd, msg, wParam, lParam);
   if (bSwallowMsg) {
     lresult = !isUnicode ? DefWindowProcA(hWnd, msg, wParam, lParam) :
@@ -372,7 +371,14 @@ bool set(HWND hwnd) {
   assert(!g_hwnd);
   assert(!g_gameWndProc);
   g_hwnd = hwnd;
-  g_gameWndProc = asWndProcP(OrigSetWindowLongA(hwnd, GWLP_WNDPROC, asLong(RemixWndProc)));
+  
+  // 检查窗口是否为Unicode窗口，选择正确的SetWindowLong函数
+  const bool isUnicode = IsWindowUnicode(hwnd);
+  if (isUnicode) {
+    g_gameWndProc = asWndProcP(OrigSetWindowLongW(hwnd, GWLP_WNDPROC, asLong(RemixWndProc)));
+  } else {
+    g_gameWndProc = asWndProcP(OrigSetWindowLongA(hwnd, GWLP_WNDPROC, asLong(RemixWndProc)));
+  }
 
   // If the original SetWindowLong fails, then something is going on
   if(!g_gameWndProc) {
