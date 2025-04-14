@@ -191,11 +191,19 @@ public:
 
         // Emit WM_CHAR on keydown for characters
         if (wm.msg == WM_KEYDOWN) {
-          WORD ascii[2] = { 0 };
-          if (1 == ToUnicode(vk, vsc, KS, reinterpret_cast<LPWSTR>(ascii), 2, 0)) {
+          // 使用WM_IME_CHAR处理中文输入
+          if (vk == VK_PROCESSKEY) {
+            // 对于IME处理的按键，依赖系统消息循环中的WM_IME_CHAR消息
+            // 不在这里处理，由系统消息循环正常传递IME消息
+            s_KS[vsc] = KS[vsc];
+            continue;
+          }
+          
+          WCHAR unicode[2] = { 0 };
+          if (1 == ToUnicode(vk, vsc, KS, unicode, 2, 0)) {
             // Only process keys that have 1:1 character representation
             wm.msg = WM_CHAR;
-            wm.wParam = ascii[0];
+            wm.wParam = unicode[0];
             forwardMessage(wm);
 
 #ifdef _DEBUG
@@ -840,6 +848,19 @@ static BOOL WINAPI HookedPeekMessageW(LPMSG lpMsg, HWND hWnd,
                               wMsgFilterMax, wRemoveMsg);
 
     if (result && lpMsg && (wRemoveMsg & PM_REMOVE) != 0) {
+      // 对IME消息特殊处理，确保中文输入正常工作
+      if (lpMsg->message == WM_IME_CHAR || 
+          lpMsg->message == WM_IME_COMPOSITION || 
+          lpMsg->message == WM_IME_NOTIFY ||
+          lpMsg->message == WM_IME_STARTCOMPOSITION ||
+          lpMsg->message == WM_IME_ENDCOMPOSITION) {
+        // 如果Remix界面活跃且不是排除键盘输入，则转发IME消息
+        if (RemixState::isUIActive() && !ClientOptions::getForwardDirectInputKeyboardPolicy()) {
+          // 正常处理IME消息，不拦截
+          return result;
+        }
+      }
+      
       // The message has been removed so we need to process it here.
       if (WndProc::invokeRemixWndProc(lpMsg->message, lpMsg->wParam, lpMsg->lParam)) {
         // Swallow the message
@@ -881,6 +902,19 @@ static BOOL WINAPI HookedGetMessageW(LPMSG lpMsg, HWND hWnd,
     result = OrigGetMessageW(lpMsg, hWnd, wMsgFilterMin, wMsgFilterMax);
 
     if (result && result != -1 && lpMsg) {
+      // 对IME消息特殊处理，确保中文输入正常工作
+      if (lpMsg->message == WM_IME_CHAR || 
+          lpMsg->message == WM_IME_COMPOSITION || 
+          lpMsg->message == WM_IME_NOTIFY ||
+          lpMsg->message == WM_IME_STARTCOMPOSITION ||
+          lpMsg->message == WM_IME_ENDCOMPOSITION) {
+        // 如果Remix界面活跃且不是排除键盘输入，则转发IME消息
+        if (RemixState::isUIActive() && !ClientOptions::getForwardDirectInputKeyboardPolicy()) {
+          // 正常处理IME消息，不拦截
+          return result;
+        }
+      }
+      
       if (WndProc::invokeRemixWndProc(lpMsg->message, lpMsg->wParam, lpMsg->lParam)) {
         // Swallow the message
         continue;
