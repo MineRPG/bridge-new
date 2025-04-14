@@ -49,6 +49,11 @@ inline static bool isInputMessage(uint32_t msg) {
   case WM_MOUSELEAVE:
   case WM_MOUSEHOVER:
   case WM_INPUT:
+  case WM_IME_CHAR:
+  case WM_IME_COMPOSITION:
+  case WM_IME_NOTIFY:
+  case WM_IME_STARTCOMPOSITION:
+  case WM_IME_ENDCOMPOSITION:
     return true;
   }
   return false;

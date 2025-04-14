@@ -199,11 +199,11 @@ public:
             continue;
           }
           
-          WCHAR unicode[2] = { 0 };
-          if (1 == ToUnicode(vk, vsc, KS, unicode, 2, 0)) {
+          WORD ascii[2] = { 0 };
+          if (1 == ToAscii(vk, vsc, KS, ascii, 0)) {
             // Only process keys that have 1:1 character representation
             wm.msg = WM_CHAR;
-            wm.wParam = unicode[0];
+            wm.wParam = ascii[0];
             forwardMessage(wm);
 
 #ifdef _DEBUG
@@ -825,6 +825,16 @@ static BOOL WINAPI HookedPeekMessageA(LPMSG lpMsg, HWND hWnd,
                               wMsgFilterMax, wRemoveMsg);
 
     if (result && lpMsg && (wRemoveMsg & PM_REMOVE) != 0) {
+      // 对IME消息特殊处理，确保中文输入正常工作
+      if (lpMsg->message == WM_IME_CHAR || 
+          lpMsg->message == WM_IME_COMPOSITION || 
+          lpMsg->message == WM_IME_NOTIFY ||
+          lpMsg->message == WM_IME_STARTCOMPOSITION ||
+          lpMsg->message == WM_IME_ENDCOMPOSITION) {
+        // 直接返回结果，不拦截任何IME消息
+        return result;
+      }
+      
       // The message has been removed so we need to process it here.
       if (WndProc::invokeRemixWndProc(lpMsg->message, lpMsg->wParam, lpMsg->lParam)) {
         // Swallow the message
@@ -854,11 +864,8 @@ static BOOL WINAPI HookedPeekMessageW(LPMSG lpMsg, HWND hWnd,
           lpMsg->message == WM_IME_NOTIFY ||
           lpMsg->message == WM_IME_STARTCOMPOSITION ||
           lpMsg->message == WM_IME_ENDCOMPOSITION) {
-        // 如果Remix界面活跃且不是排除键盘输入，则转发IME消息
-        if (RemixState::isUIActive() && !ClientOptions::getForwardDirectInputKeyboardPolicy()) {
-          // 正常处理IME消息，不拦截
-          return result;
-        }
+        // 直接返回结果，不拦截任何IME消息
+        return result;
       }
       
       // The message has been removed so we need to process it here.
@@ -882,6 +889,16 @@ static BOOL WINAPI HookedGetMessageA(LPMSG lpMsg, HWND hWnd,
     result = OrigGetMessageA(lpMsg, hWnd, wMsgFilterMin, wMsgFilterMax);
 
     if (result && result != -1 && lpMsg) {
+      // 对IME消息特殊处理，确保中文输入正常工作
+      if (lpMsg->message == WM_IME_CHAR || 
+          lpMsg->message == WM_IME_COMPOSITION || 
+          lpMsg->message == WM_IME_NOTIFY ||
+          lpMsg->message == WM_IME_STARTCOMPOSITION ||
+          lpMsg->message == WM_IME_ENDCOMPOSITION) {
+        // 直接返回结果，不拦截任何IME消息
+        return result;
+      }
+      
       if (WndProc::invokeRemixWndProc(lpMsg->message, lpMsg->wParam, lpMsg->lParam)) {
         // Swallow the message
         continue;
@@ -908,11 +925,8 @@ static BOOL WINAPI HookedGetMessageW(LPMSG lpMsg, HWND hWnd,
           lpMsg->message == WM_IME_NOTIFY ||
           lpMsg->message == WM_IME_STARTCOMPOSITION ||
           lpMsg->message == WM_IME_ENDCOMPOSITION) {
-        // 如果Remix界面活跃且不是排除键盘输入，则转发IME消息
-        if (RemixState::isUIActive() && !ClientOptions::getForwardDirectInputKeyboardPolicy()) {
-          // 正常处理IME消息，不拦截
-          return result;
-        }
+        // 直接返回结果，不拦截任何IME消息
+        return result;
       }
       
       if (WndProc::invokeRemixWndProc(lpMsg->message, lpMsg->wParam, lpMsg->lParam)) {

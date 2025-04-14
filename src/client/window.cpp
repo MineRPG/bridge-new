@@ -200,6 +200,17 @@ bool remixMsg(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
   const bool uiWasActive = RemixState::isUIActive();
 
+  // 中文输入相关消息的特殊处理，保证这些消息一定会被传递到游戏
+  if (msg == WM_IME_CHAR || 
+      msg == WM_IME_COMPOSITION || 
+      msg == WM_IME_NOTIFY ||
+      msg == WM_IME_STARTCOMPOSITION ||
+      msg == WM_IME_ENDCOMPOSITION) {
+    // 将IME消息传递给游戏窗口过程，不拦截
+    gpRemixMessageChannel->send(msg, wParam, lParam);
+    return false;
+  }
+
   // Process remix renderer-related messages
   if (gpRemixMessageChannel->onMessage(msg, wParam, lParam)) {
     if (!uiWasActive && RemixState::isUIActive()) {
@@ -275,6 +286,15 @@ bool remixMsg(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
   // Block the input message when Remix UI is active
   if (RemixState::isUIActive() && isInputMessage(msg)) {
+    // 确保IME相关消息不会被拦截
+    if (msg == WM_IME_CHAR || 
+        msg == WM_IME_COMPOSITION || 
+        msg == WM_IME_NOTIFY ||
+        msg == WM_IME_STARTCOMPOSITION ||
+        msg == WM_IME_ENDCOMPOSITION) {
+      return false;
+    }
+    
     // Block all input except ALT key up event.
     // ALT is a very special key, we must pass the key up event for ALT or risking
     // to stop receiving mouse events.

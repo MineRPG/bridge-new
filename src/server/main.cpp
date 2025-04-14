@@ -3405,6 +3405,9 @@ static inline bool initFileSys() {
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow) {
   gTimeStart = std::chrono::high_resolution_clock::now();
   
+  // 设置控制台输出为 UTF-8 编码
+  SetConsoleOutputCP(CP_UTF8);
+  
   if (!initFileSys()) {
     Logger::err("Failed to initialize rtx filesystem!");
     return 1;
